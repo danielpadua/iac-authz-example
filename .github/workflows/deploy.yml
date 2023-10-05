@@ -86,4 +86,4 @@ jobs:
       - name: Terraform outputs
         id: tf-outputs
         run: |
-          echo "bucket-name=`terraform output -raw bucket_name`" >> $GITHUB_OUTPUT
+          echo "bucket-arn=`terraform output -raw bucket_arn`" >> $GITHUB_OUTPUT
