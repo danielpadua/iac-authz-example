@@ -11,11 +11,6 @@ resource "aws_s3_bucket_versioning" "this" {
   }
 }
 
-resource "aws_s3_bucket_acl" "this" {
-  bucket = aws_s3_bucket.this.id
-  acl    = "private"
-}
-
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket = aws_s3_bucket.this.id
 

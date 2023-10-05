@@ -65,6 +65,11 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
       - name: Terraform fmt
         run: terraform fmt -check
 
@@ -79,10 +84,23 @@ jobs:
         run: terraform validate -no-color
 
       - name: Terraform plan
-        run: |          
+        run: |
           terraform plan -no-color -var-file terraform.tfvars --out tfplan.binary
           terraform show -json tfplan.binary | grep '^{.*}$' > tfplan.json
           cat tfplan.json
+
+      - name: Terraform Authz
+        run: |
+          RESULT=`opa exec --decision main/result --bundle policy/ tfplan.json`
+          ALLOWED=`echo $RESULT | jq -r '.result[0].result.allowed'`
+          VIOLATIONS=`echo $RESULT | jq -r '.result[0].result.violations'`
+          if [ "$ALLOWED" == "true" ]; then
+            echo "Terraform authz success"          
+          else
+            echo "Terraform authz failed"
+            echo "Security violations: $VIOLATIONS"
+            exit 1
+          fi
 
       - name: Terraform apply
         run: terraform apply -auto-approve -var-file terraform.tfvars
