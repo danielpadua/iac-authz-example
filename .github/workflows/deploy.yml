@@ -91,7 +91,7 @@ jobs:
 
       - name: Terraform Authz
         run: |
-          RESULT=`opa exec --decision main/result --bundle policy/ tfplan.json`
+          RESULT=`opa exec --decision main/result --bundle ../policy/ tfplan.json`
           ALLOWED=`echo $RESULT | jq -r '.result[0].result.allowed'`
           VIOLATIONS=`echo $RESULT | jq -r '.result[0].result.violations'`
           if [ "$ALLOWED" == "true" ]; then
