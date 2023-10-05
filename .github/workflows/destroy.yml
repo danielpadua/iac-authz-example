@@ -1,0 +1,76 @@
+name: iac authz example destroy workflow
+
+on:
+  workflow_dispatch:
+
+env:
+  TF_BACKEND: iac-authz-example-tf
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  terraform-backend:
+    name: Ensure terraform backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Create terraform backend
+        run: |
+          if [[ -z $(aws s3api list-buckets --query 'Buckets[?Name==`${{ env.TF_BACKEND }}`]' --output text) ]]; then
+            aws s3 mb s3://${{ env.TF_BACKEND }}
+          fi
+          aws s3api head-object --bucket bucket-name --key terraform.tfstate || NOT_EXIST=true
+          if [ $NOT_EXIST ]; then
+            aws s3api put-object --bucket ${{ env.TF_BACKEND }} --key terraform.tfstate            
+          fi
+
+  terraform:
+    name: Destroy infrastructure
+    needs: terraform-backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: iac
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          terraform init -upgrade \
+            -backend-config="bucket=${{ env.TF_BACKEND }}" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="region=${{ secrets.AWS_REGION }}"
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform plan
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+        run: terraform plan -destroy -no-color -var-file terraform.tfvars
+
+      - name: Terraform destroy
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+        run: terraform destroy -var-file terraform.tfvars
