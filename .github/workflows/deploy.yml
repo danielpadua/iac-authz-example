@@ -79,7 +79,10 @@ jobs:
         run: terraform validate -no-color
 
       - name: Terraform plan
-        run: terraform plan -no-color -var-file terraform.tfvars
+        run: |          
+          terraform plan -no-color -var-file terraform.tfvars --out tfplan.binary
+          terraform show -json tfplan.binary | grep '^{.*}$' > tfplan.json
+          cat tfplan.json
 
       - name: Terraform apply
         run: terraform apply -auto-approve -var-file terraform.tfvars
